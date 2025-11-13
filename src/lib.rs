@@ -4,9 +4,17 @@
 
 #![deny(missing_docs)]
 #![warn(clippy::all, clippy::nursery, clippy::pedantic, clippy::cargo)]
+#![allow(
+    clippy::multiple_crate_versions, // dependency issues
+    clippy::future_not_send, // compio is single-threaded by design
+)]
 
-use compio::{net::TcpListener, runtime::spawn, io::{AsyncRead, AsyncWriteExt}};
-use std::io::Error as IoError;
+use compio::{
+    io::{AsyncRead, AsyncWriteExt},
+    net::TcpListener,
+    runtime::spawn,
+};
+use std::{io::Error as IoError, net::SocketAddr};
 
 /// A HTTP/1.1 server.
 ///
@@ -46,7 +54,8 @@ impl HTTPServer {
                 match result {
                     Ok(size) => {
                         println!("Received {size} bytes from {addr}");
-                        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
+                        let response =
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
                         let _ = stream.write_all(response).await;
                     }
                     Err(e) => eprintln!("Failed to read from socket: {e}"),
@@ -57,7 +66,11 @@ impl HTTPServer {
     }
 
     /// Get the local address of the server.
-    pub fn local_addr(&self) -> Result<std::net::SocketAddr, IoError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`IoError`] if unable to retrieve the local address.
+    pub fn local_addr(&self) -> Result<SocketAddr, IoError> {
         self.listener.local_addr()
     }
 }
