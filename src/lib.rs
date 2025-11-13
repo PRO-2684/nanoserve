@@ -9,11 +9,16 @@
     clippy::future_not_send, // compio is single-threaded by design
 )]
 
+mod error;
+mod request;
+
 use compio::{
     io::{AsyncRead, AsyncWriteExt},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     runtime::spawn,
 };
+pub use error::NanoserveError;
+pub use request::{Request, ParseRequestError};
 use std::{io::Error as IoError, net::SocketAddr};
 
 /// A HTTP/1.1 server.
@@ -47,22 +52,30 @@ impl HTTPServer {
     /// Returns an [`IoError`] if the server fails to start.
     pub async fn run(&self) -> Result<(), IoError> {
         loop {
-            let (mut stream, addr) = self.listener.accept().await?;
+            let (stream, addr) = self.listener.accept().await?;
+            println!("Accepted connection from {addr}");
             let task = spawn(async move {
-                let result = stream.read([0; 1024]).await;
-                let (result, _buffer) = (result.0, result.1);
-                match result {
-                    Ok(size) => {
-                        println!("Received {size} bytes from {addr}");
-                        let response =
-                            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
-                        let _ = stream.write_all(response).await;
-                    }
-                    Err(e) => eprintln!("Failed to read from socket: {e}"),
-                }
+                Self::handle_connection(stream).await.unwrap_or_else(|e| {
+                    eprintln!("Error while handling connection from {addr}: {e}");
+                });
             });
             task.detach();
         }
+    }
+
+    /// Handles a single connection.
+    async fn handle_connection(mut stream: TcpStream) -> Result<(), NanoserveError> {
+        let result = stream.read([0; 1024]).await;
+        let (size, buffer) = (result.0?, result.1);
+        println!("Received {size} bytes");
+        let request = Request::parse(&buffer[..size])?;
+        println!("{request}");
+        // TODO: Actually handle the request and generate a response
+        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
+        stream.write_all(response).await.0?;
+        stream.close().await?;
+
+        Ok(())
     }
 
     /// Get the local address of the server.
