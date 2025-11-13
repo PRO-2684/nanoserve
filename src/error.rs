@@ -1,7 +1,7 @@
 //! Errors for nanoserve.
 
-use std::{fmt, io::Error as IoError};
 use super::ParseRequestError;
+use std::{fmt, io::Error as IoError};
 
 /// Possible errors in nanoserve.
 #[derive(Debug)]
@@ -27,8 +27,8 @@ impl From<ParseRequestError> for NanoserveError {
 impl fmt::Display for NanoserveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NanoserveError::Io(e) => write!(f, "IO error: {e}"),
-            NanoserveError::ParseRequest(e) => write!(f, "Parse request error: {e}"),
+            Self::Io(e) => write!(f, "IO error: {e}"),
+            Self::ParseRequest(e) => write!(f, "Parse request error: {e}"),
         }
     }
 }

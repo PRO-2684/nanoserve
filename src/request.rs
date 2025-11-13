@@ -1,6 +1,9 @@
 //! Request parsing module.
 
-use std::{fmt, str::{Utf8Error, from_utf8}};
+use std::{
+    fmt,
+    str::{Utf8Error, from_utf8},
+};
 
 /// An HTTP request.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,7 +43,12 @@ impl<'a> Request<'a> {
             .windows(4)
             .position(|w| w == b"\r\n\r\n")
             .map(|pos| pos + 4)
-            .or_else(|| request.windows(2).position(|w| w == b"\n\n").map(|pos| pos + 2))
+            .or_else(|| {
+                request
+                    .windows(2)
+                    .position(|w| w == b"\n\n")
+                    .map(|pos| pos + 2)
+            })
             .unwrap_or(request.len());
 
         // Split header and data at byte level
@@ -93,7 +101,7 @@ impl<'a> Request<'a> {
     }
 }
 
-impl<'a> fmt::Display for Request<'a> {
+impl fmt::Display for Request<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} {} HTTP/{}", self.method, self.path, self.version)?;
         for (key, value) in &self.headers {
@@ -108,15 +116,15 @@ impl<'a> fmt::Display for Request<'a> {
 impl fmt::Display for ParseRequestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseRequestError::InvalidRequestLine => write!(f, "Invalid request line"),
-            ParseRequestError::InvalidUtf8 => write!(f, "Invalid UTF-8 in request"),
-            ParseRequestError::IoError => write!(f, "IO error while reading request"),
+            Self::InvalidRequestLine => write!(f, "Invalid request line"),
+            Self::InvalidUtf8 => write!(f, "Invalid UTF-8 in request"),
+            Self::IoError => write!(f, "IO error while reading request"),
         }
     }
 }
 
 impl From<Utf8Error> for ParseRequestError {
     fn from(_: Utf8Error) -> Self {
-        ParseRequestError::InvalidUtf8
+        Self::InvalidUtf8
     }
 }

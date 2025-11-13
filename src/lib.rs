@@ -11,14 +11,16 @@
 
 mod error;
 mod request;
+mod response;
 
 use compio::{
-    io::{AsyncRead, AsyncWriteExt},
+    io::AsyncRead,
     net::{TcpListener, TcpStream},
     runtime::spawn,
 };
 pub use error::NanoserveError;
-pub use request::{Request, ParseRequestError};
+pub use request::{ParseRequestError, Request};
+pub use response::Response;
 use std::{io::Error as IoError, net::SocketAddr};
 
 /// A HTTP/1.1 server.
@@ -70,9 +72,8 @@ impl HTTPServer {
         println!("Received {size} bytes");
         let request = Request::parse(&buffer[..size])?;
         println!("{request}");
-        // TODO: Actually handle the request and generate a response
-        let response = b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
-        stream.write_all(response).await.0?;
+        let response = Response::handle(&request);
+        response.write_to(&mut stream).await?;
         stream.close().await?;
 
         Ok(())
