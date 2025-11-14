@@ -2,6 +2,7 @@
 
 use std::{
     fmt,
+    num::ParseIntError,
     str::{Utf8Error, from_utf8},
 };
 
@@ -24,7 +25,7 @@ pub struct Request<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RangeHeader {
     /// A valid range with start and end.
-    Bytes(u64, u64),
+    Bytes(Option<u64>, Option<u64>),
     /// Invalid or unsupported range format.
     Invalid,
     /// No range specified.
@@ -117,20 +118,34 @@ impl<'a> Request<'a> {
         for (key, value) in &self.headers {
             if key.eq_ignore_ascii_case("Range") {
                 // Expect format: bytes=start-end
-                if let Some(range_part) = value.strip_prefix("bytes=") {
-                    let mut parts = range_part.split('-');
-                    let start_str = parts.next().unwrap_or("");
-                    let end_str = parts.next().unwrap_or("");
-                    if let (Ok(start), Ok(end)) = (start_str.parse::<u64>(), end_str.parse::<u64>())
-                    {
-                        return RangeHeader::Bytes(start, end);
-                    }
+                // start or end can be omitted
+                let Some(range_part) = value.strip_prefix("bytes=") else {
                     return RangeHeader::Invalid;
+                };
+                let mut parts = range_part.split('-');
+                let (Some(start_str), Some(end_str)) = (parts.next(), parts.next()) else {
+                    return RangeHeader::Invalid;
+                };
+
+                match (
+                    Self::parse_optional(start_str),
+                    Self::parse_optional(end_str),
+                ) {
+                    (Ok(start), Ok(end)) => return RangeHeader::Bytes(start, end),
+                    _ => return RangeHeader::Invalid,
                 }
-                return RangeHeader::Invalid;
             }
         }
         RangeHeader::None
+    }
+
+    /// Helper to parse an optional u64 from a &str.
+    fn parse_optional(s: &str) -> Result<Option<u64>, ParseIntError> {
+        if s.is_empty() {
+            Ok(None)
+        } else {
+            s.parse().map(Some)
+        }
     }
 }
 

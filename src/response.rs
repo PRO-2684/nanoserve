@@ -99,6 +99,8 @@ impl Response {
         let range = request.parse_range_header();
         match range {
             RangeHeader::Bytes(start, end) => {
+                let start = start.unwrap_or(0);
+                let end = end.unwrap_or(size);
                 // Validate range
                 if end > size {
                     return Self::new(
@@ -145,10 +147,10 @@ impl Response {
         match self.body {
             ResponseBody::Static(body) => dest.write_all(body).await.0?,
             ResponseBody::File { file, size } => {
-                Self::write_file_range(&file, dest, 0, size).await?
+                Self::write_file_range(&file, dest, 0, size).await?;
             }
             ResponseBody::PartialFile { file, start, end } => {
-                Self::write_file_range(&file, dest, start, end).await?
+                Self::write_file_range(&file, dest, start, end).await?;
             }
         }
 
