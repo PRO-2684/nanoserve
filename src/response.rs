@@ -5,7 +5,7 @@ use compio::{
     fs::File,
     io::{AsyncReadAt, AsyncWriteExt},
 };
-use std::io::Result as IoResult;
+use std::{io::Result as IoResult, path::Path};
 
 /// An HTTP response.
 #[derive(Debug, Clone)]
@@ -40,8 +40,6 @@ pub enum ResponseCode {
 /// Response body.
 #[derive(Debug, Clone)]
 pub enum ResponseBody {
-    /// Empty body.
-    Empty,
     /// Static body.
     Static(&'static str),
     /// From file.
@@ -56,19 +54,53 @@ impl Response {
         Self { code, body }
     }
 
-    /// Construct a new [`BadRequest`](ResponseCode::BadRequest) response.
+    /// Construct a new [`BadRequest`](ResponseCode::BadRequest) response with the given body.
     #[must_use]
     pub const fn bad_request(body: &'static str) -> Self {
         Self::new(ResponseCode::BadRequest, body)
     }
 
+    /// Construct a new [`NotFound`](ResponseCode::NotFound) response.
+    #[must_use]
+    pub const fn not_found() -> Self {
+        Self::new(ResponseCode::NotFound, "404 Not Found")
+    }
+
     /// Handles a well-formed [`Request`].
     #[must_use]
-    pub const fn handle(_request: &Request<'_>) -> Self {
-        Self {
-            code: ResponseCode::Ok,
-            body: ResponseBody::Static("Hello from Nanoserve!"), // TODO: Implement proper handling
+    pub async fn handle(request: &Request<'_>) -> Self {
+        // Version & Method check
+        if request.version != "1.1" {
+            return Self::new(ResponseCode::BadRequest, "Unsupported HTTP Version");
+        };
+        if request.method != "GET" {
+            return Self::new(ResponseCode::MethodNotAllowed, "405 Method Not Allowed");
+        };
+        // Resolve path relative to current directory
+        let trimmed = request.path.trim_start_matches('/');
+        let path = Path::new(".").join(trimmed);
+        if !path.exists() || !path.is_file() {
+            return Self::not_found();
         }
+        // Open file and read metadata
+        let file = match File::open(&path).await {
+            Ok(f) => f,
+            Err(_) => return Self::not_found(),
+        };
+        let metadata = match file.metadata().await {
+            Ok(m) => m,
+            Err(_) => return Self::not_found(),
+        };
+        if !metadata.is_file() {
+            return Self::not_found();
+        }
+        // Create response
+        let body = ResponseBody::File {
+            file,
+            start: 0,
+            end: metadata.len(),
+        };
+        Self { code: ResponseCode::Ok, body }
     }
 
     /// Write this [`Response`] to the given destination.
@@ -84,7 +116,6 @@ impl Response {
 
         // // Dummy body
         match self.body {
-            ResponseBody::Empty => {}
             ResponseBody::Static(body) => {
                 dest.write_all(body).await.0?;
             }
