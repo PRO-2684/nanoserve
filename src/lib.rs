@@ -70,9 +70,10 @@ impl HTTPServer {
         let result = stream.read([0; 1024]).await;
         let (size, buffer) = (result.0?, result.1);
         println!("Received {size} bytes");
-        let request = Request::parse(&buffer[..size])?;
-        println!("{request}");
-        let response = Response::handle(&request);
+        let response = match Request::parse(&buffer[..size]) {
+            Err(e) => Response::bad_request(e.description()),
+            Ok(request) => Response::handle(&request),
+        };
         response.write_to(&mut stream).await?;
         stream.close().await?;
 

@@ -113,13 +113,21 @@ impl fmt::Display for Request<'_> {
     }
 }
 
+impl ParseRequestError {
+    /// Get a description of the error.
+    #[must_use]
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::InvalidRequestLine => "Invalid request line",
+            Self::InvalidUtf8 => "Invalid UTF-8 in request",
+            Self::IoError => "IO error while reading request",
+        }
+    }
+}
+
 impl fmt::Display for ParseRequestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidRequestLine => write!(f, "Invalid request line"),
-            Self::InvalidUtf8 => write!(f, "Invalid UTF-8 in request"),
-            Self::IoError => write!(f, "IO error while reading request"),
-        }
+        write!(f, "{}", self.description())
     }
 }
 
