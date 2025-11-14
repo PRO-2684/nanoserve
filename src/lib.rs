@@ -67,9 +67,36 @@ impl HTTPServer {
 
     /// Handles a single connection.
     async fn handle_connection(mut stream: TcpStream) -> Result<(), NanoserveError> {
-        let result = stream.read([0; 1024]).await;
-        let (size, buffer) = (result.0?, result.1);
-        let response = match Request::parse(&buffer[..size]) {
+        // Read the entire request into a growable buffer
+        let mut buffer = Vec::new();
+        let mut chunk = [0u8; 4096];
+
+        loop {
+            let result = stream.read(chunk).await;
+            let (size, buf) = (result.0?, result.1);
+            if size == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&buf[..size]);
+            chunk = buf;
+
+            // Stop if we've read the complete request (headers + body based on Content-Length)
+            if let Ok(req) = Request::parse(&buffer) {
+                if let Some((_, cl_str)) = req.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("Content-Length")) {
+                    if let Ok(content_length) = cl_str.parse::<usize>() {
+                        let header_size = buffer.len() - req.body.len();
+                        if buffer.len() >= header_size + content_length {
+                            break;
+                        }
+                    }
+                } else {
+                    // No Content-Length, request is complete after headers
+                    break;
+                }
+            }
+        }
+
+        let response = match Request::parse(&buffer) {
             Err(e) => Response::bad_request(e.description()),
             Ok(request) => {
                 println!("Received request:\n{request}");
