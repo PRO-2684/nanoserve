@@ -42,7 +42,7 @@ impl HTTPServer {
     /// # Errors
     ///
     /// Returns an [`IoError`] if the server fails to bind to the address.
-    pub async fn new(addr: &str) -> Result<Self, IoError> {
+    pub async fn new(addr: SocketAddr) -> Result<Self, IoError> {
         let listener = TcpListener::bind(addr).await?;
         Ok(Self { listener })
     }

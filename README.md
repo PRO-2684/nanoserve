@@ -11,7 +11,7 @@
 > [!NOTE]
 > This is a toy project, primarily used as my handin for the course [Computer Networks](https://jwcg.ucas.ac.cn/public/courseOutlines?courseId=289907).
 
-Ground-up implementation of HTTP server from TCP sockets.
+Ground-up implementation of a nano HTTP server from TCP sockets.
 
 ## ⚙️ Automatic Releases Setup
 
