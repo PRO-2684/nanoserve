@@ -1,6 +1,6 @@
 //! Response module for Nanoserve HTTP server.
 
-use super::Request;
+use super::{RangeHeader, Request};
 use compio::{
     fs::File,
     io::{AsyncReadAt, AsyncWriteExt},
@@ -43,7 +43,9 @@ pub enum ResponseBody {
     /// Static body.
     Static(&'static str),
     /// From file.
-    File { file: File, start: u64, end: u64 },
+    File { file: File, size: u64 },
+    /// From partial file.
+    PartialFile { file: File, start: u64, end: u64 },
 }
 
 impl Response {
@@ -72,10 +74,10 @@ impl Response {
         // Version & Method check
         if request.version != "1.1" {
             return Self::new(ResponseCode::BadRequest, "Unsupported HTTP Version");
-        };
+        }
         if request.method != "GET" {
             return Self::new(ResponseCode::MethodNotAllowed, "405 Method Not Allowed");
-        };
+        }
         // Resolve path relative to current directory
         let trimmed = request.path.trim_start_matches('/');
         let path = Path::new(".").join(trimmed);
@@ -83,24 +85,49 @@ impl Response {
             return Self::not_found();
         }
         // Open file and read metadata
-        let file = match File::open(&path).await {
-            Ok(f) => f,
-            Err(_) => return Self::not_found(),
+        let Ok(file) = File::open(&path).await else {
+            return Self::not_found();
         };
-        let metadata = match file.metadata().await {
-            Ok(m) => m,
-            Err(_) => return Self::not_found(),
+        let Ok(metadata) = file.metadata().await else {
+            return Self::not_found();
         };
         if !metadata.is_file() {
             return Self::not_found();
         }
-        // Create response
-        let body = ResponseBody::File {
-            file,
-            start: 0,
-            end: metadata.len(),
-        };
-        Self { code: ResponseCode::Ok, body }
+        let size = metadata.len();
+        // Check for Range header
+        let range = request.parse_range_header();
+        match range {
+            RangeHeader::Bytes(start, end) => {
+                // Validate range
+                if end > size {
+                    return Self::new(
+                        ResponseCode::RangeNotSatisfiable,
+                        "End byte exceeds file size",
+                    );
+                } else if start >= end {
+                    return Self::new(
+                        ResponseCode::RangeNotSatisfiable,
+                        "Start byte must be less than end byte",
+                    );
+                }
+                // Create partial content response
+                let body = ResponseBody::PartialFile { file, start, end };
+                Self {
+                    code: ResponseCode::PartialContent,
+                    body,
+                }
+            }
+            RangeHeader::Invalid => Self::new(ResponseCode::BadRequest, "Invalid Range Header"),
+            RangeHeader::None => {
+                // Create response
+                let body = ResponseBody::File { file, size };
+                Self {
+                    code: ResponseCode::Ok,
+                    body,
+                }
+            }
+        }
     }
 
     /// Write this [`Response`] to the given destination.
@@ -109,36 +136,52 @@ impl Response {
     ///
     /// Returns an [`IoError`](std::io::Error) if writing fails.
     pub async fn write_to<D: AsyncWriteExt>(self, dest: &mut D) -> IoResult<()> {
-        // Start line and headers (empty for now)
+        // Start line and headers
         dest.write_all("HTTP/1.1 ").await.0?;
         dest.write_all(self.code.description()).await.0?;
-        dest.write_all("\r\n\r\n").await.0?;
+        dest.write_all("\r\nAccept-Ranges: bytes\r\n\r\n").await.0?;
 
         // // Dummy body
         match self.body {
-            ResponseBody::Static(body) => {
-                dest.write_all(body).await.0?;
+            ResponseBody::Static(body) => dest.write_all(body).await.0?,
+            ResponseBody::File { file, size } => {
+                Self::write_file_range(&file, dest, 0, size).await?
             }
-            ResponseBody::File { file, start, end } => {
-                const BUF_LEN: usize = 8192;
-                let mut buffer = Vec::with_capacity(BUF_LEN);
-                let mut position = start;
-                while position < end {
-                    let result = file.read_at(buffer, position).await;
-                    let (read_bytes, mut buf) = (result.0?, result.1);
-                    if read_bytes == 0 {
-                        break;
-                    }
-                    buf.truncate(read_bytes);
-                    let result = dest.write_all(buf).await;
-                    result.0?;
-                    buffer = result.1;
-                    buffer.resize(BUF_LEN, 0);
-                    position += read_bytes as u64;
-                }
+            ResponseBody::PartialFile { file, start, end } => {
+                Self::write_file_range(&file, dest, start, end).await?
             }
         }
 
+        Ok(())
+    }
+
+    /// Helper function to write `file[start..end]` to `dest`.
+    async fn write_file_range<D: AsyncWriteExt>(
+        file: &File,
+        dest: &mut D,
+        start: u64,
+        end: u64,
+    ) -> IoResult<()> {
+        const BUF_LEN: usize = 8192;
+        let mut buffer = vec![0; BUF_LEN];
+        let mut position = start;
+        while position < end {
+            let result = file.read_at(buffer, position).await;
+            let (read_bytes, mut buf) = (result.0?, result.1);
+            if read_bytes == 0 {
+                break;
+            }
+            // Only write up to the end boundary
+            #[allow(clippy::cast_possible_truncation, reason = "BUF_LEN fits in usize")]
+            let remaining = (end - position).min(BUF_LEN as u64) as usize;
+            let to_write = read_bytes.min(remaining);
+            buf.truncate(to_write);
+            let result = dest.write_all(buf).await;
+            result.0?;
+            buffer = result.1;
+            buffer.resize(BUF_LEN, 0);
+            position += to_write as u64;
+        }
         Ok(())
     }
 }

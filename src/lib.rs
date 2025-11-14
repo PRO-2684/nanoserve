@@ -19,7 +19,7 @@ use compio::{
     runtime::spawn,
 };
 pub use error::NanoserveError;
-pub use request::{ParseRequestError, Request};
+pub use request::{ParseRequestError, RangeHeader, Request};
 pub use response::Response;
 use std::{io::Error as IoError, net::SocketAddr};
 

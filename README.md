@@ -64,6 +64,11 @@ TODO
 
 TODO
 
+## ✅ TODO
+
+- [ ] Accept `HEAD` and `OPTIONS`, returning file metadata
+- [ ] `Content-Length` header
+
 ## 🎉 Credits
 
 TODO

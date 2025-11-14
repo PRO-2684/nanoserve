@@ -20,6 +20,17 @@ pub struct Request<'a> {
     pub body: &'a [u8],
 }
 
+/// Range header representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeHeader {
+    /// A valid range with start and end.
+    Bytes(u64, u64),
+    /// Invalid or unsupported range format.
+    Invalid,
+    /// No range specified.
+    None,
+}
+
 /// Possible errors when parsing an HTTP packet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseRequestError {
@@ -98,6 +109,28 @@ impl<'a> Request<'a> {
             }
         }
         headers
+    }
+
+    /// Parse the `Range` header, if present.
+    #[must_use]
+    pub fn parse_range_header(&self) -> RangeHeader {
+        for (key, value) in &self.headers {
+            if key.eq_ignore_ascii_case("Range") {
+                // Expect format: bytes=start-end
+                if let Some(range_part) = value.strip_prefix("bytes=") {
+                    let mut parts = range_part.split('-');
+                    let start_str = parts.next().unwrap_or("");
+                    let end_str = parts.next().unwrap_or("");
+                    if let (Ok(start), Ok(end)) = (start_str.parse::<u64>(), end_str.parse::<u64>())
+                    {
+                        return RangeHeader::Bytes(start, end);
+                    }
+                    return RangeHeader::Invalid;
+                }
+                return RangeHeader::Invalid;
+            }
+        }
+        RangeHeader::None
     }
 }
 
