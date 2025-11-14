@@ -67,7 +67,7 @@ impl HTTPServer {
 
     /// Handles a single connection.
     async fn handle_connection(mut stream: TcpStream) -> Result<(), NanoserveError> {
-        let result = stream.read([0; 1024]).await;
+        let result = stream.read([0; 4096]).await;
         let (size, buffer) = (result.0?, result.1);
         let response = match Request::parse(&buffer[..size]) {
             Err(e) => Response::bad_request(e.description()),
