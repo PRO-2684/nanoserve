@@ -21,7 +21,7 @@ async fn main() {
 
     // Wait for Ctrl+C
     ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    println!("\nReceived Ctrl+C, shutting down server...");
+    println!("Received Ctrl+C, shutting down server...");
 
     // Cancel the server task
     drop(server_task);

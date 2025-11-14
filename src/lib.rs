@@ -69,10 +69,12 @@ impl HTTPServer {
     async fn handle_connection(mut stream: TcpStream) -> Result<(), NanoserveError> {
         let result = stream.read([0; 1024]).await;
         let (size, buffer) = (result.0?, result.1);
-        println!("Received {size} bytes");
         let response = match Request::parse(&buffer[..size]) {
             Err(e) => Response::bad_request(e.description()),
-            Ok(request) => Response::handle(&request).await,
+            Ok(request) => {
+                println!("Received request:\n{request}");
+                Response::handle(&request).await
+            }
         };
         response.write_to(&mut stream).await?;
         stream.close().await?;

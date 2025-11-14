@@ -126,6 +126,9 @@ impl<'a> Request<'a> {
                 let (Some(start_str), Some(end_str)) = (parts.next(), parts.next()) else {
                     return RangeHeader::Invalid;
                 };
+                if parts.next().is_some() {
+                    return RangeHeader::Invalid;
+                }
 
                 match (
                     Self::parse_optional(start_str),
@@ -156,7 +159,7 @@ impl fmt::Display for Request<'_> {
             writeln!(f, "{key}: {value}")?;
         }
         let body_length = self.body.len();
-        writeln!(f, "\n[Body: {body_length} bytes]")?;
+        writeln!(f, "[Body: {body_length} bytes]")?;
         Ok(())
     }
 }

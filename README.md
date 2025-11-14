@@ -11,7 +11,7 @@
 > [!NOTE]
 > This is a toy project, primarily used as my handin for the course [Computer Networks](https://jwcg.ucas.ac.cn/public/courseOutlines?courseId=289907).
 
-Ground-up implementation of a nano HTTP server from TCP sockets.
+Nanoserve is a lightweight, educational HTTP/1.1 server implementation built using TCP sockets and modern Rust async I/O. It demonstrates HTTP protocol fundamentals, asynchronous networking, and systems programming best practices. This server supports core HTTP/1.1 features including GET requests, range requests (partial content), graceful shutdown, and efficient file serving.
 
 ## ⚙️ Automatic Releases Setup
 
