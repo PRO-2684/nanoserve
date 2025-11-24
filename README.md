@@ -13,31 +13,6 @@
 
 Nanoserve is a lightweight, educational HTTP/1.1 server implementation built using TCP sockets and modern Rust async I/O. It demonstrates HTTP protocol fundamentals, asynchronous networking, and systems programming best practices. This server supports core HTTP/1.1 features including GET requests, range requests (partial content), graceful shutdown, and efficient file serving.
 
-## ⚙️ Automatic Releases Setup
-
-1. [Create a new GitHub repository](https://github.com/new) with the name `nanoserve` and push this generated project to it.
-2. Enable Actions for the repository, and grant "Read and write permissions" to the workflow [here](https://github.com/PRO-2684/nanoserve/settings/actions).
-3. [Generate an API token on crates.io](https://crates.io/settings/tokens/new), with the following setup:
-
-    - `Name`: `nanoserve`
-    - `Expiration`: `No expiration`
-    - `Scopes`: `publish-new`, `publish-update`
-    - `Crates`: `nanoserve`
-
-4. [Add a repository secret](https://github.com/PRO-2684/nanoserve/settings/secrets/actions/new) named `CARGO_TOKEN` with the generated token as its value.
-5. Consider removing this section and updating this README with your own project information.
-
-[Trusted Publishing](https://crates.io/docs/trusted-publishing) is a recent feature added to crates.io. To utilize it, first make sure you've already successfully published the crate to crates.io. Then, follow these steps:
-
-1. [Add a new trusted publisher](https://crates.io/crates/nanoserve/settings/new-trusted-publisher) to your crate.
-    - Set "Workflow filename" to `release.yml`.
-    - Keep other fields intact.
-    - Click "Add".
-2. Modify [`release.yml`](.github/workflows/release.yml).
-    1. Comment out or remove the `publish-release` job.
-    2. Un-comment the `trusted-publishing` job.
-3. Remove the `CARGO_TOKEN` [repository secret](https://github.com/PRO-2684/nanoserve/settings/secrets/actions).
-
 ## 📥 Installation
 
 ### Using [`binstall`](https://github.com/cargo-bins/cargo-binstall)
